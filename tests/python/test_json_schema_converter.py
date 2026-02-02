@@ -2283,5 +2283,75 @@ def test_utf8_array_const():
     assert _is_grammar_accept_string(grammar, '["こんにちは","😊","你好","hello","\\n"]')
 
 
+def test_no_leading_whitespace_root_object():
+    """Test that root object rules don't have leading whitespace."""
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    ebnf_grammar = _json_schema_to_ebnf(schema, any_whitespace=True)
+    # Root rule should start with "{" not "[ \n\t]*" or whitespace before the brace
+    root_rule_line = [line for line in ebnf_grammar.split('\n') if line.strip().startswith('root ::=')][0]
+    root_rule_stripped = root_rule_line.strip()
+    # Should start with root ::= "{" or root ::= (("{" but NOT root ::= "[ \n\t]*" "{" 
+    assert root_rule_stripped.startswith('root ::= "{"') or root_rule_stripped.startswith('root ::= (("{"'), \
+        f"Root rule should start with opening brace, got: {root_rule_stripped[:50]}"
+    # Should NOT have whitespace pattern before the opening brace
+    assert not root_rule_stripped.startswith('root ::= "[ \\n\\t]*" "{"'), \
+        "Root rule should not have leading whitespace pattern before opening brace"
+    assert not root_rule_stripped.startswith('root ::= "[ \\n\\t]{0,'), \
+        "Root rule should not have leading whitespace pattern before opening brace"
+
+
+def test_no_leading_whitespace_root_array():
+    """Test that root array rules don't have leading whitespace."""
+    schema = {"type": "array", "items": {"type": "string"}}
+    ebnf_grammar = _json_schema_to_ebnf(schema, any_whitespace=True)
+    # Root rule should start with "[" not whitespace before the bracket
+    root_rule_line = [line for line in ebnf_grammar.split('\n') if line.strip().startswith('root ::=')][0]
+    root_rule_stripped = root_rule_line.strip()
+    # Should start with root ::= ("[" or root ::= "[" but NOT root ::= "[ \n\t]*" "["
+    assert root_rule_stripped.startswith('root ::= ("["') or root_rule_stripped.startswith('root ::= "["'), \
+        f"Root rule should start with opening bracket, got: {root_rule_stripped[:50]}"
+    # Should NOT have whitespace pattern before the opening bracket
+    assert not root_rule_stripped.startswith('root ::= "[ \\n\\t]*" "["'), \
+        "Root rule should not have leading whitespace pattern before opening bracket"
+    assert not root_rule_stripped.startswith('root ::= "[ \\n\\t]{0,'), \
+        "Root rule should not have leading whitespace pattern before opening bracket"
+
+
+def test_no_leading_whitespace_accepts_valid_json():
+    """Test that grammars without leading whitespace still accept valid JSON."""
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    grammar = xgr.Grammar.from_json_schema(schema, any_whitespace=True)
+    # Should accept JSON without leading whitespace
+    assert _is_grammar_accept_string(grammar, '{"name": "test"}')
+    # Should accept JSON with whitespace inside (but not leading)
+    assert _is_grammar_accept_string(grammar, '{"name": "test"}')
+    assert _is_grammar_accept_string(grammar, '{ "name" : "test" }')
+    # Should reject JSON with leading whitespace
+    assert not _is_grammar_accept_string(grammar, ' {"name": "test"}')
+    assert not _is_grammar_accept_string(grammar, '\n{"name": "test"}')
+    assert not _is_grammar_accept_string(grammar, '\t{"name": "test"}')
+
+
+def test_no_leading_whitespace_nested_objects():
+    """Test that nested objects still allow whitespace, only root doesn't."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "nested": {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            }
+        },
+        "required": ["nested"],
+    }
+    grammar = xgr.Grammar.from_json_schema(schema, any_whitespace=True)
+    # Root should not have leading whitespace, but nested objects can have whitespace
+    assert _is_grammar_accept_string(grammar, '{"nested": {"value": "test"}}')
+    assert _is_grammar_accept_string(grammar, '{"nested": { "value" : "test" }}')
+    # Should reject leading whitespace on root
+    assert not _is_grammar_accept_string(grammar, ' {"nested": {"value": "test"}}')
+
+
 if __name__ == "__main__":
     pytest.main(sys.argv)
