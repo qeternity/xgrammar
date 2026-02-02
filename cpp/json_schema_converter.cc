@@ -2179,13 +2179,9 @@ std::string JSONSchemaConverter::VisitArray(
 
   auto array_spec = std::move(array_spec_result).Unwrap();
 
-  // Check if this is the root rule to prevent leading whitespace
-  bool is_root_rule = (rule_name == kRootRuleName);
-
   indentManager_->StartIndent();
 
-  // Skip leading whitespace for root rule
-  auto start_separator = is_root_rule ? "" : indentManager_->StartSeparator();
+  auto start_separator = indentManager_->StartSeparator();
   auto mid_separator = indentManager_->MiddleSeparator();
   auto end_separator = indentManager_->EndSeparator();
   auto empty_separator = indentManager_->EmptySeparator();
@@ -2407,12 +2403,9 @@ std::string JSONSchemaConverter::GetPartialRuleForProperties(
   std::string first_sep;
   std::string mid_sep;
   std::string last_sep;
-  // Check if this is the root rule to prevent leading whitespace
-  bool is_root_rule = (rule_name == kRootRuleName);
   switch (json_format) {
     case (JSONFormat::kJSON): {
-      // Skip leading whitespace for root rule
-      first_sep = is_root_rule ? "" : NextSeparator();
+      first_sep = NextSeparator();
       mid_sep = NextSeparator();
       last_sep = NextSeparator(true);
       break;
@@ -3248,9 +3241,6 @@ std::string JSONSchemaConverter::VisitObject(
   // last, and handle non-empty cases before that.
   bool could_be_empty = false;
 
-  // Check if this is the root rule to prevent leading whitespace
-  bool is_root_rule = (rule_name == kRootRuleName);
-
   // Handle additional properties
   std::string additional_suffix = "";
   picojson::value additional_property;
@@ -3275,8 +3265,7 @@ std::string JSONSchemaConverter::VisitObject(
     std::string beg_seq;
     switch (json_format) {
       case (JSONFormat::kJSON): {
-        // Skip leading whitespace for root rule
-        beg_seq = is_root_rule ? "" : NextSeparator();
+        beg_seq = NextSeparator();
         break;
       }
       case (JSONFormat::kXML): {
@@ -3352,9 +3341,7 @@ std::string JSONSchemaConverter::VisitObject(
     }
   } else if (object_spec.properties.size() > 0) {
     //  Case 2: properties are defined
-    // Skip leading whitespace for root rule
-    std::string prefix = is_root_rule ? "" : " ";
-    result += prefix + GetPartialRuleForProperties(
+    result += " " + GetPartialRuleForProperties(
                         object_spec.properties,
                         object_spec.required_properties,
                         additional_property,
@@ -3375,10 +3362,7 @@ std::string JSONSchemaConverter::VisitObject(
           other_property_pattern += GetOtherPropertyPattern(
               kBasicString, additional_property, rule_name, additional_suffix
           );
-          // Skip leading whitespace for root rule
-          std::string prefix = is_root_rule ? "" : " ";
-          std::string separator = is_root_rule ? "" : NextSeparator();
-          result += prefix + separator + (separator.empty() ? "" : " ") + other_property_pattern + " ";
+          result += " " + NextSeparator() + " " + other_property_pattern + " ";
           break;
         }
         case (JSONFormat::kXML): {
