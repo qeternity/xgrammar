@@ -2307,8 +2307,10 @@ def test_no_leading_whitespace_root_array():
     # Root rule should start with "[" not whitespace before the bracket
     root_rule_line = [line for line in ebnf_grammar.split('\n') if line.strip().startswith('root ::=')][0]
     root_rule_stripped = root_rule_line.strip()
-    # Should start with root ::= ("[" or root ::= "[" but NOT root ::= "[ \n\t]*" "["
-    assert root_rule_stripped.startswith('root ::= ("["') or root_rule_stripped.startswith('root ::= "["'), \
+    # Should start with root ::= (("[" or root ::= ("[" or root ::= "[" but NOT root ::= "[ \n\t]*" "["
+    assert (root_rule_stripped.startswith('root ::= (("["') or 
+            root_rule_stripped.startswith('root ::= ("["') or 
+            root_rule_stripped.startswith('root ::= "["')), \
         f"Root rule should start with opening bracket, got: {root_rule_stripped[:50]}"
     # Should NOT have whitespace pattern before the opening bracket
     assert not root_rule_stripped.startswith('root ::= "[ \\n\\t]*" "["'), \
@@ -2318,18 +2320,45 @@ def test_no_leading_whitespace_root_array():
 
 
 def test_no_leading_whitespace_accepts_valid_json():
-    """Test that grammars without leading whitespace still accept valid JSON."""
+    """Test that grammars reject leading whitespace but still permit internal whitespace."""
     schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
     grammar = xgr.Grammar.from_json_schema(schema, any_whitespace=True)
-    # Should accept JSON without leading whitespace
+    
+    # 1. Should accept JSON without leading whitespace
     assert _is_grammar_accept_string(grammar, '{"name": "test"}')
-    # Should accept JSON with whitespace inside (but not leading)
-    assert _is_grammar_accept_string(grammar, '{"name": "test"}')
-    assert _is_grammar_accept_string(grammar, '{ "name" : "test" }')
-    # Should reject JSON with leading whitespace
-    assert not _is_grammar_accept_string(grammar, ' {"name": "test"}')
-    assert not _is_grammar_accept_string(grammar, '\n{"name": "test"}')
-    assert not _is_grammar_accept_string(grammar, '\t{"name": "test"}')
+    
+    # 2. Should accept JSON with internal whitespace (spaces, newlines, tabs)
+    assert _is_grammar_accept_string(grammar, '{ "name" : "test" }')  # spaces around elements
+    assert _is_grammar_accept_string(grammar, '{\n  "name": "test"\n}')  # newlines
+    assert _is_grammar_accept_string(grammar, '{\t"name":\t"test"\t}')  # tabs
+    assert _is_grammar_accept_string(grammar, '{\n\t"name":\n\t\t"test"\n}')  # mixed whitespace
+    
+    # 3. Should reject JSON with leading whitespace (before opening brace)
+    assert not _is_grammar_accept_string(grammar, ' {"name": "test"}')  # leading space
+    assert not _is_grammar_accept_string(grammar, '\n{"name": "test"}')  # leading newline
+    assert not _is_grammar_accept_string(grammar, '\t{"name": "test"}')  # leading tab
+    assert not _is_grammar_accept_string(grammar, ' \n\t{"name": "test"}')  # mixed leading whitespace
+
+
+def test_no_leading_whitespace_accepts_valid_json_array():
+    """Test that array grammars reject leading whitespace but still permit internal whitespace."""
+    schema = {"type": "array", "items": {"type": "string"}}
+    grammar = xgr.Grammar.from_json_schema(schema, any_whitespace=True)
+    
+    # 1. Should accept JSON without leading whitespace
+    assert _is_grammar_accept_string(grammar, '["test"]')
+    
+    # 2. Should accept JSON with internal whitespace (spaces, newlines, tabs)
+    assert _is_grammar_accept_string(grammar, '[ "test" ]')  # spaces around elements
+    assert _is_grammar_accept_string(grammar, '[\n  "test"\n]')  # newlines
+    assert _is_grammar_accept_string(grammar, '[\t"test"\t]')  # tabs
+    assert _is_grammar_accept_string(grammar, '[\n\t"test",\n\t"test2"\n]')  # mixed whitespace with multiple items
+    
+    # 3. Should reject JSON with leading whitespace (before opening bracket)
+    assert not _is_grammar_accept_string(grammar, ' ["test"]')  # leading space
+    assert not _is_grammar_accept_string(grammar, '\n["test"]')  # leading newline
+    assert not _is_grammar_accept_string(grammar, '\t["test"]')  # leading tab
+    assert not _is_grammar_accept_string(grammar, ' \n\t["test"]')  # mixed leading whitespace
 
 
 def test_no_leading_whitespace_nested_objects():
